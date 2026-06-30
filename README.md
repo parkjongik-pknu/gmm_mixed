@@ -10,9 +10,9 @@ install.packages("devtools")
 
 library(devtools)
 
-install_github("parkjongik-pknu/gmm_mixed")
+pak::pak("parkjongik-pknu/mixedgmm")
 
-library(gmm_mixed)
+library(mixedgmm)
 ```
 <br>
 
