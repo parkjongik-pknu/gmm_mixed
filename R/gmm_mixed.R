@@ -158,7 +158,6 @@ gmm_mixed <- function(X_Q = NULL, X_W = NULL, X_D = NULL, K = NULL, K_max = NULL
     ))
   } else {
     if (is.null(best_model)) stop("모델 적합에 실패했습니다. (데이터 문제 혹은 수렴 실패)")
-    # 단일 K 모드일 때는 리스트를 벗겨내고 결과 자체만 깔끔하게 반환
     return(best_model)
   }
 }
