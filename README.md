@@ -23,5 +23,10 @@ In **GMM**
 ```
 gmm_mixed(X_Q, X_W, X_D, K)
 
+X_Q : continuous variables
 
+X_W : categorical variables
+
+X_D : discrete variables
+```
 
