@@ -1,3 +1,4 @@
 exportPattern("^[[:alpha:]]+")
 importFrom(mvtnorm, dmvnorm)
 importFrom(cluster, pam)
+importFrom(mclust, Mclust)
