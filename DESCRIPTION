@@ -1,10 +1,10 @@
-Package: gmm_mixed
+Package: mixedgmm
 Title: Clustering Methods for GMM and CWM
 Version: 0.1.0
 Author: parkjongik
 Maintainer: Jongik Park <dhwkd1230@pukyong.ac.kr>
 Description: This package provides functions for Gaussian Mixture Models (GMM) 
-    and Cluster-Weighted Models (CWM)
+    with mixed covariagtes
 License: MIT
 Encoding: UTF-8
 LazyData: true
