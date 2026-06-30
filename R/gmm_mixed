@@ -1,0 +1,138 @@
+library(mvtnorm)
+library(mclust)
+
+
+gmm_mixed <- function(X_Q = NULL, X_W = NULL, X_D = NULL, K = 3, max_iter = 100, tol = 1e-6) {
+  
+  if (K < 2) stop("K는 2 이상")
+  
+  N <- max(nrow(X_Q), nrow(X_W), nrow(X_D))
+  if (is.null(X_Q)) X_Q <- matrix(0, nrow = N, ncol = 0)
+  if (is.null(X_D)) X_D <- matrix(0, nrow = N, ncol = 0)
+  if (is.null(X_W)) X_W <- data.frame(matrix(NA, nrow = N, ncol = 0))
+  
+  P_Q <- ncol(X_Q)
+  P_D <- ncol(X_D)
+  P_W <- ncol(X_W)
+  
+  # initialization
+  X_num <- cbind(X_Q, X_D)
+  Z <- matrix(0, nrow = N, ncol = K)
+  
+  if (ncol(X_num) > 0) {
+    gmm_init <- suppressWarnings(mclust::Mclust(X_num, G = K, verbose = FALSE))
+    
+    if (!is.null(gmm_init) && !is.null(gmm_init$z)) {
+      Z <- gmm_init$z
+    } else {
+      km <- kmeans(scale(X_num), centers = K, nstart = 10)
+      for (k in 1:K) Z[, k] <- ifelse(km$cluster == k, 1, 0)
+    }
+  } else {
+    rand_mat <- matrix(runif(N * K), N, K)
+    Z <- rand_mat / rowSums(rand_mat)
+  }
+  
+  mu_k <- list()
+  sigma_k <- list()
+  nu_k <- list()
+  alpha_k <- list()
+  
+  ll_history <- numeric()
+  curr_ll <- -Inf
+  
+  
+  # EM algorithm
+  for (iter in 1:max_iter) {
+    
+    # M-step
+    N_k <- colSums(Z)
+    pi_k <- N_k / N
+    
+    for (k in 1:K) {
+      
+      # 1. continuous
+      if (P_Q > 0) { 
+        mu_k[[k]] <- colSums(Z[, k] * X_Q) / max(N_k[k], 1e-10)
+        diff_k <- sweep(X_Q, 2, mu_k[[k]])
+        sigma_k[[k]] <- t(diff_k) %*% (Z[, k] * diff_k) / max(N_k[k], 1e-10) + diag(1e-5, P_Q) 
+      }
+      
+      # 2. discrete
+      if (P_D > 0) {
+        nu_k[[k]] <- colSums(Z[, k] * X_D) / max(N_k[k], 1e-10)
+      }
+      
+      # 3. categorical
+      if (P_W > 0) { 
+        alpha_list <- list()
+        for (j in 1:P_W) { 
+          lvls <- levels(X_W[, j])
+          alpha_vec <- sapply(lvls, function(l) sum(Z[, k] * (X_W[, j] == l)) / max(N_k[k], 1e-10))
+          alpha_list[[j]] <- alpha_vec / sum(alpha_vec) 
+        }
+        alpha_k[[k]] <- alpha_list 
+      }
+    }
+    
+    # E-Step
+    f_k <- matrix(0, nrow = N, ncol = K)
+    
+    for (k in 1:K) {
+      prob_X <- rep(1, N)
+      
+      if (P_Q > 0) prob_X <- prob_X * dmvnorm(X_Q, mean = mu_k[[k]], sigma = sigma_k[[k]])
+      
+      if (P_D > 0) { 
+        for (j in 1:P_D) prob_X <- prob_X * dpois(X_D[, j], lambda = nu_k[[k]][j]) 
+      }
+      
+      if (P_W > 0) { 
+        for (j in 1:P_W) prob_X <- prob_X * alpha_k[[k]][[j]][as.character(X_W[, j])] 
+      }
+      
+      f_k[, k] <- pi_k[k] * prob_X
+    }
+    
+    f_total <- rowSums(f_k)
+    f_total_safe <- pmax(f_total, 1e-300)
+    
+    Z <- sweep(f_k, 1, f_total_safe, "/")
+    
+    prev_ll <- curr_ll
+    curr_ll <- sum(log(f_total_safe))
+    ll_history <- c(ll_history, curr_ll)
+    
+    if (iter > 1 && abs(curr_ll - prev_ll) < tol) break
+  }
+  
+
+  n_pi <- K - 1
+  n_mu <- ifelse(P_Q > 0, K * P_Q, 0)
+  n_sigma <- ifelse(P_Q > 0, K * (P_Q * (P_Q + 1)) / 2, 0)
+  n_nu <- ifelse(P_D > 0, K * P_D, 0)
+  n_alpha <- ifelse(P_W > 0, K * sum(sapply(1:P_W, function(j) length(levels(X_W[, j])) - 1)), 0)
+  
+  total_params <- n_pi + n_mu + n_sigma + n_nu + n_alpha
+  # BIC
+  BIC <- -2 * curr_ll + total_params * log(N)
+  
+  # ICL
+  Z_safe <- pmax(Z, 1e-300)
+  ICL <- BIC - 2 * sum(Z * log(Z_safe))
+  
+  return(list(
+    K = K,
+    pi = pi_k,
+    mu = mu_k,
+    sigma = sigma_k,
+    nu = nu_k,
+    alpha = alpha_k,
+    Z = Z,
+    loglik = ll_history,
+    BIC = BIC,
+    ICL = ICL,
+    n_params = total_params,
+    iterations = iter
+  ))
+}
