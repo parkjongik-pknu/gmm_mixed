@@ -28,5 +28,7 @@ X_Q : continuous variables
 X_W : categorical variables
 
 X_D : discrete variables
+
+You need to separate the variables into continuous, categorical, and discrete types, and scale them before fitting the model.
 ```
 
